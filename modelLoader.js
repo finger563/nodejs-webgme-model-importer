@@ -2,13 +2,10 @@
 define(['q'], function(Q) {
     'use strict';
     return {
-	loadModel: function(core, modelNode, doResolve, doProcessModel) {
+	loadModel: function(core, modelNode, doResolve) {
 	    var self = this;
 	    if (doResolve === undefined) {
 		doResolve = false;
-	    }
-	    if (doProcessModel === undefined) {
-		doProcessModel = false;
 	    }
 
 	    var nodeName = core.getAttribute(modelNode, 'name'),
@@ -85,9 +82,6 @@ define(['q'], function(Q) {
 		    if (doResolve)
 			self.resolvePointers(model.objects);
 
-		    if (doProcessModel)
-			self.processModel(model);
-
 		    model.root = model.objects[model.root]
 
 		    return model;
@@ -137,31 +131,6 @@ define(['q'], function(Q) {
 		    obj[set] = dsts;
 		}
 	    });
-	},
-	processModel: function(model) {
-	    // convert Parent objects to pointers of src objects
-	    var root = model.objects[model.root];
-	    if (root.Parent_list) {
-		root.Parent_list.map(function(parent) {
-		    parent.src.pointers.parent = parent.pointers.dst;
-		    parent.src.parent = parent.pointers.dst;
-		});
-	    }
-	    this.updateNames(model.objects);
-	},
-	updateNames: function(objects) {
-	    var numObjs = {};
-	    var objPaths = Object.keys(objects);
-	    objPaths.map(function(objPath) {
-		var obj = objects[objPath];
-		if (obj.name == obj.type) {
-		    if (!numObjs[obj.type])
-			numObjs[obj.type] = 0;
-		    obj.name += numObjs[obj.type];
-		    obj.attributes.name += numObjs[obj.type];
-		    numObjs[obj.type]++;
-		}
-	    });
-	},
+	}
     }
 });
