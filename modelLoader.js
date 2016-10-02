@@ -2,10 +2,13 @@
 define(['q'], function(Q) {
     'use strict';
     return {
-	loadModel: function(core, modelNode, doResolve) {
+	loadModel: function(core, modelNode, doResolve, keepWebGMENodes) {
 	    var self = this;
 	    if (doResolve === undefined) {
 		doResolve = false;
+	    }
+	    if (keepWebGMENodes === undefined) {
+		keepWebGMENodes = false;
 	    }
 
 	    var nodeName = core.getAttribute(modelNode, 'name'),
@@ -26,13 +29,14 @@ define(['q'], function(Q) {
 		name: nodeName,
 		path: nodePath,
 		type: nodeType,
-		node: modelNode,
 		parentPath: parentPath,
 		childPaths: childPaths,
 		attributes: {},
 		pointers: {},
 		sets: {}
 	    };
+	    if (keepWebGMENodes)
+		model.objects[nodePath].node = modelNode;
 	    attributes.map(function(attribute) {
 		var val = core.getAttribute(modelNode, attribute);
 		model.objects[nodePath].attributes[attribute] = val;
@@ -59,13 +63,14 @@ define(['q'], function(Q) {
 			    name: nodeName,
 			    path: nodePath,
 			    type: nodeType,
-			    node: node,
 			    parentPath: parentPath,
 			    childPaths: childPaths,
 			    attributes: {},
 			    pointers: {},
 			    sets: {}
 			};
+			if (keepWebGMENodes)
+			    model.objects[nodePath].node = node;
 			attributes.map(function(attribute) {
 			    var val = core.getAttribute(node, attribute);
 			    model.objects[nodePath].attributes[attribute] = val;
@@ -111,7 +116,7 @@ define(['q'], function(Q) {
 		    if (dst)
 			obj[pointer] = dst;
                     else if (pointer != 'base' && path != null)
-                        self.logger.error(
+                        self.notify('error',
                             'Cannot save pointer to object outside tree: ' + 
                                 pointer + ', ' + path);
 		}
@@ -124,7 +129,7 @@ define(['q'], function(Q) {
 			if (dst)
 			    dsts.push(dst);
                         else if (path != null)
-                            self.logger.error(
+                            self.notify('error',
                                 'Cannot save set member not in tree: ' + 
                                     set + ', ' + path);
                     });
