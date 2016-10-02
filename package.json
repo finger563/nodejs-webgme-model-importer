@@ -1,0 +1,26 @@
+{
+  "name": "webgme-to-json",
+  "version": "1.0.0",
+  "description": "Creates a meta-agnostic JSON structure from a (sub-)tree of a WebGME model.",
+  "main": "modelLoader.js",
+  "scripts": {
+    "test": "loadModel(core, modelNode, doResolve)"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://finger563@github.com/finger563/nodejs-webgme-to-json.git"
+  },
+  "keywords": [
+    "webgme",
+    "json"
+  ],
+  "author": "William Emfinger",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/finger563/nodejs-webgme-to-json/issues"
+  },
+  "homepage": "https://github.com/finger563/nodejs-webgme-to-json#readme",
+  "dependencies": {
+    "q": "^1.4.1"
+  }
+}
