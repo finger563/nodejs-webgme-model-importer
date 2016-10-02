@@ -1,6 +1,6 @@
 {
   "name": "webgme-to-json",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Creates a meta-agnostic JSON structure from a (sub-)tree of a WebGME model.",
   "main": "modelLoader.js",
   "scripts": {
