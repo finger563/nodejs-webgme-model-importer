@@ -2,7 +2,7 @@
 define(['q'], function(Q) {
     'use strict';
     return {
-	loadModel: function(core, modelNode, doResolve, keepWebGMENodes) {
+	loadModel: function(core, rootNode, modelNode, doResolve, keepWebGMENodes, loadFromOutsideTree) {
 	    var self = this;
 	    if (doResolve === undefined) {
 		doResolve = false;
@@ -10,22 +10,54 @@ define(['q'], function(Q) {
 	    if (keepWebGMENodes === undefined) {
 		keepWebGMENodes = false;
 	    }
+	    if (loadFromOutsideTree === undefined) {
+		loadFromOutsideTree = false;
+	    }
 
-	    var nodeName = core.getAttribute(modelNode, 'name'),
-	    nodePath = core.getPath(modelNode),
-	    nodeType = core.getAttribute(core.getBaseType(modelNode), 'name'),
-	    parentPath = core.getPath(core.getParent(modelNode)),
-	    attributes = core.getAttributeNames(modelNode),
-	    childPaths = core.getChildrenPaths(modelNode),
-	    pointers = core.getPointerNames(modelNode),
-	    sets = core.getSetNames(modelNode);
-
+	    var pathList = [];
 	    var model = {
 		'objects': {
 		},
-		'root': nodePath
+		'root': ''
 	    };
-	    model.objects[nodePath] = {
+
+	    var newObj = self.loadNode(core, modelNode, pathList, keepWebGMENodes);
+	    model.objects[newObj.path] = newObj;
+	    model.root = newObj.path;
+
+	    return core.loadSubTree(modelNode)
+		.then(function(nodes) {
+		    nodes.map(function(node) {
+			newObj = self.loadNode(core, node, pathList, keepWebGMENodes);
+			model.objects[newObj.path] = newObj;
+		    });
+
+		    if (doResolve) {
+			self.resolvePointers(model.objects);
+		    }
+
+		    if (loadFromOutsideTree) {
+			var loadedPaths = Object.keys(model.objects);
+			pathList = pathList.filter(function(path) { return loadedPaths.indexOf(path) == -1; });
+			self.continueLoading(core, rootNode, model, pathList, keepWebGMENodes);
+		    }
+
+		    model.root = model.objects[model.root]
+
+		    return model;
+		});
+	},
+	loadNode: function(core, node, pathList, keepWebGMENodes) {
+	    var self = this;
+	    var nodeName = core.getAttribute(node, 'name'),
+		nodePath = core.getPath(node),
+		nodeType = core.getAttribute(core.getBaseType(node), 'name'),
+		parentPath = core.getPath(core.getParent(node)),
+		attributes = core.getAttributeNames(node),
+		childPaths = core.getChildrenPaths(node),
+		pointers = core.getPointerNames(node),
+		sets = core.getSetNames(node);
+	    var newObj = {
 		name: nodeName,
 		path: nodePath,
 		type: nodeType,
@@ -35,62 +67,26 @@ define(['q'], function(Q) {
 		pointers: {},
 		sets: {}
 	    };
+	    if (childPaths.length)
+		pathList = pathList.concat(childPaths);
 	    if (keepWebGMENodes)
-		model.objects[nodePath].node = modelNode;
+		newObj.node = node;
 	    attributes.map(function(attribute) {
-		var val = core.getAttribute(modelNode, attribute);
-		model.objects[nodePath].attributes[attribute] = val;
-		model.objects[nodePath][attribute] = val;
+		var val = core.getAttribute(node, attribute);
+		newObj.attributes[attribute] = val;
+		newObj[attribute] = val;
 	    });
 	    pointers.map(function(pointer) {
-		model.objects[nodePath].pointers[pointer] = core.getPointerPath(modelNode, pointer);
+		newObj.pointers[pointer] = core.getPointerPath(node, pointer);
+		if (newObj.pointers[pointer])
+		    pathList.push(newObj.pointers[pointer]);
 	    });
 	    sets.map(function(set) {
-		model.objects[nodePath].sets[set] = core.getMemberPaths(modelNode, set);
+		newObj.sets[set] = core.getMemberPaths(node, set);
+		if (newObj.sets[set].length)
+		    pathList = pathList.concat(newObj.sets[set]);
 	    });
-	    return core.loadSubTree(modelNode)
-		.then(function(nodes) {
-		    nodes.map(function(node) {
-			nodeName = core.getAttribute(node, 'name');
-			nodePath = core.getPath(node);
-			nodeType = core.getAttribute(core.getBaseType(node), 'name');
-			parentPath = core.getPath(core.getParent(node));
-			attributes = core.getAttributeNames(node);
-			childPaths = core.getChildrenPaths(node);
-			pointers = core.getPointerNames(node);
-			sets = core.getSetNames(node);
-			model.objects[nodePath] = {
-			    name: nodeName,
-			    path: nodePath,
-			    type: nodeType,
-			    parentPath: parentPath,
-			    childPaths: childPaths,
-			    attributes: {},
-			    pointers: {},
-			    sets: {}
-			};
-			if (keepWebGMENodes)
-			    model.objects[nodePath].node = node;
-			attributes.map(function(attribute) {
-			    var val = core.getAttribute(node, attribute);
-			    model.objects[nodePath].attributes[attribute] = val;
-			    model.objects[nodePath][attribute] = val;
-			});
-			pointers.map(function(pointer) {
-			    model.objects[nodePath].pointers[pointer] = core.getPointerPath(node, pointer);
-			});
-			sets.map(function(set) {
-			    model.objects[nodePath].sets[set] = core.getMemberPaths(node, set);
-			});
-		    });
-
-		    if (doResolve)
-			self.resolvePointers(model.objects);
-
-		    model.root = model.objects[model.root]
-
-		    return model;
-		});
+	    return newObj;
 	},
 	resolvePointers: function(objects) {
 	    var self = this;
@@ -136,6 +132,32 @@ define(['q'], function(Q) {
 		    obj[set] = dsts;
 		}
 	    });
-	}
+	},
+	continueLoading: function(core, rootNode, model, pathList, keepWebGMENodes) {
+	    var self = this;
+	    var tasks = pathList.map(function(path) {
+		return core.loadByPath(rootNode, path)
+		    .then(function(node) {
+			if (!core.isMetaNode(node)) {
+			    var newObj = self.loadNode(core, node, pathList, keepWebGMENodes);
+			    if (newObj)
+				model.objects[newObj.path] = newObj;
+			}
+			else {
+			    pathList = pathList.filter(function(p) { return p != path; });
+			}
+		    });
+	    });
+	    return Q.all(tasks)
+		.then(function() {
+		    var loadedPaths = Object.keys(model.objects);
+		    pathList = pathList.filter(function(path) { return loadedPaths.indexOf(path) == -1; });
+		    if (pathList.length)
+			return self.continueLoading(core, rootNode, model, pathList, keepWebGMENodes);
+		});
+	},
+	loadFromOutsideTree: function(ptrPath) {
+	    var self = this;
+	},
     }
 });
